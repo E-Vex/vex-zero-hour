@@ -81,3 +81,19 @@ void aiBuildTeam(PlayerIndex playerIndex, const char* teamName);
  * Useful for debugging or if AI gets stuck.
  */
 void emergencyDisableAIControl();
+
+// ----------------------------------------------------------------------------------------------
+// Internal helper functions (not part of public API)
+// ----------------------------------------------------------------------------------------------
+
+/**
+ * Internal: Check if skirmish AI is enabled for a player.
+ * Used internally by the AI system.
+ */
+Bool isSkirmishAIEnabled(PlayerIndex playerIndex);
+
+/**
+ * Internal: Get the count of AI-controlled players.
+ * Useful for debugging and statistics.
+ */
+Int getAIControlledPlayerCount();
