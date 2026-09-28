@@ -2,9 +2,9 @@ add_executable(z_generals WIN32)
 
 # Use a binary name that doesn't conflict with original game.
 if("${CMAKE_SYSTEM}" MATCHES "Windows")
-    set_target_properties(z_generals PROPERTIES OUTPUT_NAME GeneralsOnlineZH)
+    set_target_properties(z_generals PROPERTIES OUTPUT_NAME "GeneralsOnlineZH${RTS_BUILD_OUTPUT_SUFFIX}")
 else()
-    set_target_properties(z_generals PROPERTIES OUTPUT_NAME GeneralsOnlineZH)
+    set_target_properties(z_generals PROPERTIES OUTPUT_NAME "GeneralsOnlineZH${RTS_BUILD_OUTPUT_SUFFIX}")
 endif()
 
 target_link_libraries(z_generals PRIVATE
@@ -67,11 +67,18 @@ if(WIN32)
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
 			"${CMAKE_CURRENT_SOURCE_DIR}/../GameEngine/Source/GameNetwork/GeneralsOnline/Vendor/DiscordRPC/LICENSE.txt"
 			"$<TARGET_FILE_DIR:z_generals>/discord-rpc-LICENSE.txt"
-		COMMAND ${CMAKE_COMMAND} -E copy -t "$<TARGET_FILE_DIR:z_generals>"
-			$<TARGET_RUNTIME_DLLS:z_generals>
-			COMMAND_EXPAND_LISTS
 	)
 
+	if(EXISTS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/sentry-native/crashpad_handler.exe")
+		# sentry's crashpad backend is an out-of-process watcher: it needs its
+		# own executable next to the game, at the default handler path sentry
+		# looks for (see sentry_options_set_handler_path in sentry.h).
+		add_custom_command(TARGET z_generals POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+				"${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/sentry-native/crashpad_handler.exe"
+				"$<TARGET_FILE_DIR:z_generals>/crashpad_handler.exe"
+		)
+	endif()
 endif()
 
 # RC files optional for MinGW builds

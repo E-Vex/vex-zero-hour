@@ -4,8 +4,6 @@
 #include <ctime>
 #include <mutex>
 #include <string>
-#include <locale>
-#include <codecvt>
 #include "../OnlineServices_Init.h"
 #include "../OnlineServices_Auth.h"
 
@@ -14,16 +12,40 @@ std::mutex m_logMutex;
 
 extern NGMPGame* TheNGMPGame;
 
+// Win32 conversions handle surrogate pairs and substitute U+FFFD for invalid input instead of throwing,
+// so a malformed name from the server can't take down the UI
 std::string to_utf8(const std::wstring& wstr)
 {
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-	return converter.to_bytes(wstr);
+	if (wstr.empty())
+		return std::string();
+
+	int len = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(), nullptr, 0, nullptr, nullptr);
+	std::string result(len, '\0');
+	WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(), result.data(), len, nullptr, nullptr);
+	return result;
 }
 
 std::wstring from_utf8(const std::string& utf8_str)
 {
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-	return converter.from_bytes(utf8_str);
+	if (utf8_str.empty())
+		return std::wstring();
+
+	int len = MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(), (int)utf8_str.size(), nullptr, 0);
+	std::wstring result(len, L'\0');
+	MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(), (int)utf8_str.size(), result.data(), len);
+	return result;
+}
+
+// Legacy format strings take player names as narrow %hs arguments, which get widened byte by byte and mangle UTF-8.
+// Rewriting %hs to %s lets callers pass a from_utf8() decoded name instead.
+std::wstring WidenFormatSpecifiers(const std::wstring& format)
+{
+	std::wstring widened = format;
+	for (size_t pos = widened.find(L"%hs"); pos != std::wstring::npos; pos = widened.find(L"%hs", pos + 2))
+	{
+		widened.erase(pos + 1, 1);
+	}
+	return widened;
 }
 
 std::wstring NormalizeSingleLineText(const std::wstring& text)

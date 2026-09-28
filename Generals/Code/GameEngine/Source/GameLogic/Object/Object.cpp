@@ -5622,7 +5622,7 @@ void Object::enterGroup( AIGroup *group )
 #if RETAIL_COMPATIBLE_AIGROUP
 	m_group = group;
 #else
-	m_group = AIGroupPtr::Create_AddRef(group);
+	m_group.Assign_Add_Ref(group);
 #endif
 }
 
@@ -5640,3 +5640,8 @@ void Object::leaveGroup()
 	}
 }
 
+//-------------------------------------------------------------------------------------------------
+Real Object::getCarrierDeckHeight() const
+{
+	return 0.0f;
+}

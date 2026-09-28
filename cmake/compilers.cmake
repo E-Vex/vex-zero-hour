@@ -24,16 +24,6 @@ else()
     set(IS_VS6_BUILD FALSE)
 endif()
 
-if(NOT DEFINED RTS_BUILD_OPTION_OPTIMIZED)
-    option(RTS_BUILD_OPTION_OPTIMIZED "Enable aggressive MSVC Release optimizations." OFF)
-endif()
-if(NOT DEFINED RTS_BUILD_OPTION_PGO)
-    set(RTS_BUILD_OPTION_PGO "OFF" CACHE STRING "MSVC profile-guided optimization mode.")
-endif()
-if(NOT DEFINED RTS_PGO_FILE)
-    set(RTS_PGO_FILE "${CMAKE_BINARY_DIR}/genzh.pgd" CACHE FILEPATH "MSVC PGO database path.")
-endif()
-
 # Make release builds have debug information too.
 if(MSVC)
     # Create PDB for Release as long as debug info was generated during compile.
@@ -42,7 +32,6 @@ if(MSVC)
     
     # /INCREMENTAL:NO prevents PDB size bloat in Debug configuration(s).
     add_link_options("/INCREMENTAL:NO")
-
 else()
     # We go a bit wild here and assume any other compiler we are going to use supports -g for debug info.
     # Add debug symbols to Release builds for crash dump analysis, profiling, and post-mortem debugging.

@@ -63,16 +63,6 @@ else()
 endif()
 
 include(cmake/config.cmake)
-
-if(RTS_BUILD_ZEROHOUR AND NOT IS_VS6_BUILD)
-    if(NOT VCPKG_TOOLCHAIN)
-        message(FATAL_ERROR
-            "Zero Hour networking dependencies require the vcpkg toolchain. "
-            "Configure with -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake.")
-    endif()
-    include(cmake/networking.cmake)
-endif()
-
 include(cmake/gamespy.cmake)
 include(cmake/lzhl.cmake)
 include(cmake/stb.cmake)

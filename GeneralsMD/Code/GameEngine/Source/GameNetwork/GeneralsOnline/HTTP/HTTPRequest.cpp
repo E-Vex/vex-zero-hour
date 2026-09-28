@@ -150,10 +150,6 @@ bool HTTPRequest::InvokeDelayAction()
 
 void HTTPRequest::Threaded_SetComplete(CURLcode result)
 {
-	if (result == CURLE_SSL_CACERT_BADFILE || result == CURLE_PEER_FAILED_VERIFICATION)
-	{
-		HTTPManager::SetCACertStoreBad();
-	}
 	// store response code
 	curl_easy_getinfo(m_pCURL, CURLINFO_RESPONSE_CODE, &m_responseCode);
 
@@ -323,34 +319,10 @@ void HTTPRequest::PlatformStartRequest()
 		curl_easy_setopt(m_pCURL, CURLOPT_VERBOSE, 1);
 #else
 
-		// TODO_NGMP: We should move to libcurl backed by SChannel so we don't need to do this
-		// Check if cacert.pem exists
-
-		if (HTTPManager::IsCACertStoreBad())
-		{
-            curl_easy_setopt(m_pCURL, CURLOPT_SSL_VERIFYPEER, 0);
-            curl_easy_setopt(m_pCURL, CURLOPT_SSL_VERIFYHOST, 0);
-		}
-		else
-		{
-            std::ifstream certFile("cacert.pem");
-            if (certFile.good())
-            {
-                certFile.close();
-                curl_easy_setopt(m_pCURL, CURLOPT_CAINFO, "cacert.pem");
-
-                curl_easy_setopt(m_pCURL, CURLOPT_SSL_VERIFYPEER, 1L);
-                curl_easy_setopt(m_pCURL, CURLOPT_SSL_VERIFYHOST, 2L);
-            }
-            else
-            {
-				HTTPManager::SetCACertStoreBad();
-                curl_easy_setopt(m_pCURL, CURLOPT_SSL_VERIFYPEER, 0);
-                curl_easy_setopt(m_pCURL, CURLOPT_SSL_VERIFYHOST, 0);
-            }
-		}
-
-       
+		// Use the OS cert store (needed since we build curl against OpenSSL, not schannel).
+		curl_easy_setopt(m_pCURL, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+		curl_easy_setopt(m_pCURL, CURLOPT_SSL_VERIFYPEER, 1L);
+		curl_easy_setopt(m_pCURL, CURLOPT_SSL_VERIFYHOST, 2L);
 #endif
 
 		pHTTPManager->AddHandleToMulti(m_pCURL);

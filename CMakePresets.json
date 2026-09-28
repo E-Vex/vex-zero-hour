@@ -148,6 +148,8 @@
                 "strategy": "external"
             },
             "cacheVariables": {
+                "VCPKG_TARGET_TRIPLET": "x86-windows-static-md",
+                "VCPKG_INSTALL_OPTIONS": "--x-buildtrees-root=$env{LOCALAPPDATA}/vcpkg/bt",
                 "RTS_FLAGS": "/W3"
             },
             "vendor": {

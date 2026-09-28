@@ -159,14 +159,9 @@ void NGMP_OnlineServices_AuthInterface::SendMiddlewareToken(std::string strMWTok
 
     NGMP_OnlineServicesManager::GetInstance()->GetHTTPManager()->SendPOSTRequest(strLoginURI.c_str(), EIPProtocolVersion::DONT_CARE, mapHeaders, strPostData.c_str(), [=](bool bSuccess, int statusCode, std::string strBody, HTTPRequest* pReq)
         {
-            if (statusCode >= 400 && statusCode < 500)
+            if (!bSuccess || statusCode < 200 || statusCode >= 300)
             {
-                ClearGSMessageBoxes();
-                GSMessageBoxOk(UnicodeString(L"Middleware Login Failed"), UnicodeString(L"Middleware Login Failed"), []()
-                    {
-                        TheShell->pop();
-                    });
-                return;
+				NGMP_OnlineServicesManager::GetInstance()->SetPendingFullTeardown(EGOTearDownReason::MIDDLEWARE_LOGIN_FAILED);
             }
             else
             {

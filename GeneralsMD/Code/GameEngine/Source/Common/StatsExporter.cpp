@@ -33,6 +33,8 @@
 #include "GameLogic/Module/BattlePlanUpdate.h"
 
 #include <stdio.h>
+// Keep zconf.h from redefining 'Byte' (BaseTypeCore.h) when using unprefixed zlib (vcpkg).
+#define __MACTYPES__
 #include <zlib.h>
 
 #include "GameNetwork/GeneralsOnline/json.hpp"

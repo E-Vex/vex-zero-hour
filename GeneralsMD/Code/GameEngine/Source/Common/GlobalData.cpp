@@ -1064,6 +1064,8 @@ GlobalData::GlobalData()
 	m_forceBenchmark = FALSE;	///<forces running of CPU detection benchmark, even on known cpu's.
 
 	m_keyboardCameraRotateSpeed = 0.1f;
+	m_cameraRotateSpeedMultiplier = 1.0f;
+	m_cameraPitchSpeedMultiplier = 1.0f;
 
 #if defined(USE_MAULLER_ONEDRIVE_FIX)
 	// Set user data directory based on registry settings instead of INI parameters.
@@ -1274,6 +1276,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_playerInfoListFontSize = optionPref.getPlayerInfoListFontSize();
 	TheWritableGlobalData->m_showMoneyPerMinute = optionPref.getShowMoneyPerMinute();
 	TheWritableGlobalData->m_gameWindowTransitionSpeedMultiplier = optionPref.getGameWindowTransitionSpeedMultiplier();
+	TheWritableGlobalData->m_cameraRotateSpeedMultiplier = optionPref.getCameraRotateSpeedMultiplier();
+	TheWritableGlobalData->m_cameraPitchSpeedMultiplier = optionPref.getCameraPitchSpeedMultiplier();
 	TheWritableGlobalData->m_observerStatsFontSize = optionPref.getObserverStatsFontSize();
 	TheWritableGlobalData->m_observerNotificationFontSize = optionPref.getObserverNotificationFontSize();
 	TheWritableGlobalData->m_observerNotificationSpecialPowerUsage = optionPref.getObserverNotificationSpecialPowerUsage();

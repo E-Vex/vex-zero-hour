@@ -47,6 +47,17 @@ if(MSVC AND RTS_BUILD_OPTION_OPTIMIZED AND NOT IS_VS6_BUILD)
     )
 endif()
 
+if(MSVC AND NOT IS_VS6_BUILD)
+    target_compile_options(core_config INTERFACE
+        $<$<CONFIG:Release>:/guard:cf>
+    )
+    target_link_options(core_config INTERFACE
+        $<$<CONFIG:Release>:/DYNAMICBASE>
+        $<$<CONFIG:Release>:/NXCOMPAT>
+        $<$<CONFIG:Release>:/guard:cf>
+    )
+endif()
+
 if(NOT "${RTS_BUILD_OPTION_PGO}" MATCHES "^(OFF|GENERATE|USE)$")
     message(FATAL_ERROR "RTS_BUILD_OPTION_PGO must be OFF, GENERATE, or USE")
 elseif(MSVC AND NOT "${RTS_BUILD_OPTION_PGO}" STREQUAL "OFF" AND NOT IS_VS6_BUILD)
