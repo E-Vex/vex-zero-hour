@@ -1225,7 +1225,7 @@ void WOLQuickMatchMenuInit( WindowLayout *layout, void *userData )
 
 				for (PlaylistEntry& playlist : vecPlaylists)
 				{
-					s.format(L"%hs", playlist.Name.c_str());
+					s = UnicodeString(from_utf8(playlist.Name).c_str());
 					GadgetComboBoxAddEntry(comboBoxNumPlayers, s, GameSpyColor[GSCOLOR_DEFAULT]);
 				}
 
@@ -1241,7 +1241,7 @@ void WOLQuickMatchMenuInit( WindowLayout *layout, void *userData )
 		pLobbyInterface->RegisterForMatchmakingMessageCallback([](std::string strMsg)
 			{
 				UnicodeString uMsg;
-				uMsg.format(L"%hs", strMsg.c_str());
+				uMsg = UnicodeString(from_utf8(strMsg).c_str());
 
 				Int index = GadgetListBoxAddEntryText(quickmatchTextWindow, uMsg, GameSpyColor[GSCOLOR_DEFAULT], -1, -1);
 				GadgetListBoxSetItemData(quickmatchTextWindow, (void*)-1, index);

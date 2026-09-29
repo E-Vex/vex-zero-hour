@@ -55,9 +55,60 @@ target_include_directories(z_generals PRIVATE
 )
 
 target_sources(z_generals PRIVATE
+    VCRuntimeCheck.cpp
     WinMain.cpp
     WinMain.h
 )
+
+# Stamp the file version of the runtime this toolset ships, the minimum VCRuntimeCheck.cpp accepts
+if(MSVC AND NOT IS_VS6_BUILD)
+    # cl.exe lives in VC/Tools/MSVC/<ver>/bin/Host<arch>/<arch>
+    get_filename_component(_go_vc_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    get_filename_component(_go_vc_dir "${_go_vc_dir}/../../../../../.." ABSOLUTE)
+    set(_go_redist_version_file "${_go_vc_dir}/Auxiliary/Build/Microsoft.VCRedistVersion.default.txt")
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(_go_redist_arch x64)
+    else()
+        set(_go_redist_arch x86)
+    endif()
+
+    set(_go_msvcp "")
+    if(EXISTS "${_go_redist_version_file}")
+        file(STRINGS "${_go_redist_version_file}" _go_redist_dir_version LIMIT_COUNT 1)
+        string(STRIP "${_go_redist_dir_version}" _go_redist_dir_version)
+        file(GLOB _go_msvcp "${_go_vc_dir}/Redist/MSVC/${_go_redist_dir_version}/${_go_redist_arch}/Microsoft.VC*.CRT/msvcp140.dll")
+    endif()
+
+    set(_go_msvcp_version "")
+    if(_go_msvcp)
+        list(GET _go_msvcp 0 _go_msvcp)
+        execute_process(
+            COMMAND powershell -NoProfile -NonInteractive -Command "(Get-Item -LiteralPath '${_go_msvcp}').VersionInfo.FileVersion"
+            OUTPUT_VARIABLE _go_msvcp_version
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+    endif()
+
+    if(_go_msvcp_version MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+        message(STATUS "VC++ runtime check requires ${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3} or newer")
+        set_source_files_properties(VCRuntimeCheck.cpp PROPERTIES COMPILE_DEFINITIONS
+            "GO_VCREDIST_MAJOR=${CMAKE_MATCH_1};GO_VCREDIST_MINOR=${CMAKE_MATCH_2};GO_VCREDIST_BUILD=${CMAKE_MATCH_3}")
+    else()
+        message(WARNING "Could not read the toolset's msvcp140.dll version, the VC++ runtime check falls back to the compiler version")
+    endif()
+
+    # New STL features live in satellite DLLs older redistributables lack, and a missing import stops the
+    # loader before any game code runs. Delay-load them so VCRuntimeCheck.cpp can detect and install instead.
+    # LNK4199 is the harmless "no imports found" warning for satellites the exe doesn't use (yet).
+    target_link_options(z_generals PRIVATE
+        "/DELAYLOAD:msvcp140_atomic_wait.dll"
+        "/DELAYLOAD:msvcp140_1.dll"
+        "/DELAYLOAD:msvcp140_2.dll"
+        "/DELAYLOAD:msvcp140_codecvt_ids.dll"
+        "/IGNORE:4199"
+    )
+    target_link_libraries(z_generals PRIVATE delayimp)
+endif()
 
 if(WIN32)
 	add_custom_command(TARGET z_generals POST_BUILD

@@ -112,7 +112,9 @@ void OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t
 			NGMP_OnlineServices_LobbyInterface* pJoinOrderLobby = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
 			const bool bWeJoinedLater = pJoinOrderLobby == nullptr || !pJoinOrderLobby->IsJoinOrderKnown() || pJoinOrderLobby->JoinedAfter(userID);
 			const bool bPeerLeft = pJoinOrderLobby != nullptr && pJoinOrderLobby->IsJoinOrderKnown() && !pJoinOrderLobby->IsLobbyMember(userID);
-			bool bShouldRetry = serviceConf.retry_signalling && ((!bWeJoinedLater && !bPeerLeft) || signallingAttemptsBeforeDisconnect < numSignallingAttempts);
+			// a match can't leave its lobby, so keep repairing the link until the service drops the player
+			const bool bInMatch = TheGameLogic != nullptr && TheGameLogic->isInInternetGame();
+			bool bShouldRetry = serviceConf.retry_signalling && ((bInMatch && !bPeerLeft) || (!bWeJoinedLater && !bPeerLeft) || signallingAttemptsBeforeDisconnect < numSignallingAttempts);
 
 			bool bWasError = pInfo->m_info.m_eState == k_ESteamNetworkingConnectionState_ProblemDetectedLocally || pInfo->m_info.m_eEndReason != k_ESteamNetConnectionEnd_App_Generic;
 			plrConnection.SetDisconnected(bWasError, pMesh, bShouldRetry && bWasError);
@@ -173,7 +175,12 @@ void OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t
 					NetworkLog(ELogVerbosity::LOG_RELEASE, "[STEAM NETWORKING][DISCONNECT HANDLER] Not retrying, handling disconnect as failure...");
 
 					NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
-					if (pLobbyInterface != nullptr)
+					if (pLobbyInterface != nullptr && pLobbyInterface->IsHost())
+					{
+						// the host keeps its lobby; the peer that can't connect is the one to go
+						NetworkLog(ELogVerbosity::LOG_RELEASE, "[STEAM NETWORKING][DISCONNECT HANDLER] Not leaving, we host this lobby; dropping user %lld only", userID);
+					}
+					else if (pLobbyInterface != nullptr)
 					{
 						NetworkLog(ELogVerbosity::LOG_RELEASE, "[STEAM NETWORKING][DISCONNECT HANDLER] Performing local removal for user %lld from lobby due to failure to connect\n", userID);
 
@@ -871,6 +878,14 @@ void NetworkMesh::StartConnectionSignalling(const char* szMiddlewareID, int64_t 
 	}
 	else
 	{
+        // no relay without our TURN credentials
+        if (m_bAwaitingTurnCredentials)
+        {
+            NetworkLog(ELogVerbosity::LOG_RELEASE, "[SIGNAL] Holding signalling with %lld until our TURN credentials arrive", remoteUserID);
+            m_vecSignallingAwaitingTurn.push_back({ szMiddlewareID != nullptr ? szMiddlewareID : "", remoteUserID, preferredPort });
+            return;
+        }
+
         // if we already have a connection to this use, drop it, having a single-direction connection will break signalling
         int previousAttempts = 0;
         auto it = m_mapConnections.find(remoteUserID);
@@ -992,7 +1007,44 @@ void NetworkMesh::StartConnectionSignalling(const char* szMiddlewareID, int64_t 
             m_mapConnections[remoteUserID].m_SignallingAttempts = previousAttempts + 1;
         }
 	}
-	
+
+}
+
+void NetworkMesh::AwaitTurnCredentials()
+{
+	std::lock_guard<std::recursive_mutex> lock(m_mapConnectionsMutex);
+	m_bAwaitingTurnCredentials = true;
+}
+
+void NetworkMesh::SetTurnCredentials(const std::string& strUsername, const std::string& strToken)
+{
+	std::vector<PendingSignalling> vecPending;
+	{
+		std::lock_guard<std::recursive_mutex> lock(m_mapConnectionsMutex);
+
+		m_strTurnUsername = strUsername;
+		m_strTurnToken = strToken;
+		m_strTurnUsernameString = std::format("{},{}", m_strTurnUsername.c_str(), m_strTurnUsername.c_str());
+		m_strTurnTokenString = std::format("{},{}", m_strTurnToken.c_str(), m_strTurnToken.c_str());
+
+		// incoming connections use the listen socket's TURN settings
+		if (m_hListenSock != k_HSteamListenSocket_Invalid)
+		{
+			SteamNetworkingUtils()->SetConfigValue(k_ESteamNetworkingConfig_P2P_TURN_UserList, k_ESteamNetworkingConfig_ListenSocket,
+				(intptr_t)m_hListenSock, k_ESteamNetworkingConfig_String, m_strTurnUsernameString.c_str());
+			SteamNetworkingUtils()->SetConfigValue(k_ESteamNetworkingConfig_P2P_TURN_PassList, k_ESteamNetworkingConfig_ListenSocket,
+				(intptr_t)m_hListenSock, k_ESteamNetworkingConfig_String, m_strTurnTokenString.c_str());
+		}
+
+		m_bAwaitingTurnCredentials = false;
+		vecPending.swap(m_vecSignallingAwaitingTurn);
+	}
+
+	NetworkLog(ELogVerbosity::LOG_RELEASE, "[SIGNAL] Got TURN credentials, starting %d held signalling request(s)", (int)vecPending.size());
+	for (const PendingSignalling& pending : vecPending)
+	{
+		StartConnectionSignalling(pending.strMiddlewareID.c_str(), pending.remoteUserID, pending.preferredPort);
+	}
 }
 
 

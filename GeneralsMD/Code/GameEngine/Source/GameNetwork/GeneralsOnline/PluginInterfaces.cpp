@@ -5,7 +5,7 @@
 #include "../OnlineServices_Auth.h"
 #include "../OnlineServices_LobbyInterface.h"
 
-bool AnticheatPlugInterface::g_bPendingExitLobby = false;
+std::atomic<bool> AnticheatPlugInterface::g_bPendingExitLobby = false;
 
 #if defined(GENERALS_ONLINE_USE_PLUGINS_INTERFACE)
 
@@ -423,7 +423,11 @@ void AnticheatPlugInterface::Authenticate()
                         // don't trust the plugin to terminate the buffer
                         buf[sizeof(buf) - 1] = '\0';
 
+#if _DEBUG
                         NetworkLog(ELogVerbosity::LOG_RELEASE, "[AC] Got MW token: %s", buf);
+#else
+                        NetworkLog(ELogVerbosity::LOG_RELEASE, "[AC] Got MW token (%zu chars)", strlen(buf));
+#endif
 
                         // Now we can begin login
                         NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
@@ -475,6 +479,9 @@ void AnticheatPlugInterface::BeginSession()
 
 void AnticheatPlugInterface::EndSession()
 {
+    // a stale exit request would eject us from the next lobby
+    g_bPendingExitLobby = false;
+
 #if defined(AC_ENABLED)
     if (IsPluginLoaded() && Functions.fnEndSession != nullptr)
     {

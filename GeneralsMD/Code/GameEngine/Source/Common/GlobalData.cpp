@@ -69,6 +69,49 @@ GlobalData* TheWritableGlobalData = nullptr;				///< The global data singleton
 //-------------------------------------------------------------------------------------------------
 GlobalData* GlobalData::m_theOriginal = nullptr;
 
+#ifndef WC_NO_BEST_FIT_CHARS
+#define WC_NO_BEST_FIT_CHARS 0x00000400
+#endif
+
+//-------------------------------------------------------------------------------------------------
+// Converts to the process code page that every char* file API uses; fails instead of mangling characters it can't represent
+static Bool wideToProcessCodePage(const wchar_t* widePath, AsciiString& out)
+{
+	const Bool isUtf8 = GetACP() == CP_UTF8;
+	const UINT codePage = isUtf8 ? CP_UTF8 : CP_ACP;
+	const DWORD flags = isUtf8 ? 0 : WC_NO_BEST_FIT_CHARS;
+	BOOL usedDefaultChar = FALSE;
+	BOOL* pUsedDefaultChar = isUtf8 ? nullptr : &usedDefaultChar;
+
+	const int len = WideCharToMultiByte(codePage, flags, widePath, -1, nullptr, 0, nullptr, pUsedDefaultChar);
+	if (len <= 0 || usedDefaultChar)
+		return FALSE;
+
+	char* buffer = new char[len];
+	const int written = WideCharToMultiByte(codePage, flags, widePath, -1, buffer, len, nullptr, pUsedDefaultChar);
+	if (written > 0 && !usedDefaultChar)
+		out = buffer;
+	delete[] buffer;
+	return written > 0 && !usedDefaultChar;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Narrow form of a wide path; falls back to the ASCII 8.3 short path when the code page can't hold it (pre UTF-8 Windows)
+static AsciiString widePathToFileApiPath(const wchar_t* widePath)
+{
+	AsciiString path;
+	if (wideToProcessCodePage(widePath, path))
+		return path;
+
+	wchar_t shortPath[_MAX_PATH + 1];
+	const DWORD shortLen = GetShortPathNameW(widePath, shortPath, _MAX_PATH + 1);
+	if (shortLen > 0 && shortLen <= _MAX_PATH && wideToProcessCodePage(shortPath, path))
+		return path;
+
+	DEBUG_LOG(("Documents path can't be represented in code page %u and has no short name", GetACP()));
+	return AsciiString::TheEmptyString;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1075,10 +1118,13 @@ GlobalData::GlobalData()
 #else
     // Set user data directory based on registry settings instead of INI parameters. This allows us to
 // localize the leaf name.
-    char temp[_MAX_PATH + 1];
-    if (::SHGetSpecialFolderPath(nullptr, temp, CSIDL_PERSONAL, true))
+    wchar_t temp[_MAX_PATH + 1];
+    AsciiString myDocumentsDirectory;
+    if (::SHGetSpecialFolderPathW(nullptr, temp, CSIDL_PERSONAL, true))
+        myDocumentsDirectory = widePathToFileApiPath(temp);
+
+    if (!myDocumentsDirectory.isEmpty())
     {
-        AsciiString myDocumentsDirectory = temp;
 
         if (myDocumentsDirectory.getCharAt(myDocumentsDirectory.getLength() - 1) != '\\')
             myDocumentsDirectory.concat('\\');
@@ -1421,14 +1467,14 @@ AsciiString GlobalData::BuildUserDataPathFromRegistry()
 		HRESULT hr = pSHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, nullptr, &pszPath);
 
 		if (SUCCEEDED(hr) && pszPath) {
-			myDocumentsDirectory.translate(pszPath);
+			myDocumentsDirectory = widePathToFileApiPath(pszPath);
 			CoTaskMemFree(pszPath);
 		}
 	}
 	else {
-		char temp[_MAX_PATH + 1];
-		if (SHGetSpecialFolderPath(nullptr, temp, CSIDL_PERSONAL, true)) {
-			myDocumentsDirectory = temp;
+		wchar_t temp[_MAX_PATH + 1];
+		if (SHGetSpecialFolderPathW(nullptr, temp, CSIDL_PERSONAL, true)) {
+			myDocumentsDirectory = widePathToFileApiPath(temp);
 		}
 	}
 

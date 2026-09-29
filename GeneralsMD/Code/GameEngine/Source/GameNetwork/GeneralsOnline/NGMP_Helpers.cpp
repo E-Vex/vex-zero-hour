@@ -36,6 +36,44 @@ std::wstring from_utf8(const std::string& utf8_str)
 	return result;
 }
 
+#ifndef WC_NO_BEST_FIT_CHARS
+#define WC_NO_BEST_FIT_CHARS 0x00000400
+#endif
+
+// Process code page text (paths from local file APIs) to UTF-8 for the wire
+std::string local_to_utf8(const std::string& local_str)
+{
+	if (local_str.empty() || GetACP() == CP_UTF8)
+		return local_str;
+
+	int wlen = MultiByteToWideChar(CP_ACP, 0, local_str.data(), (int)local_str.size(), nullptr, 0);
+	if (wlen <= 0)
+		return local_str;
+
+	std::wstring wide(wlen, L'\0');
+	MultiByteToWideChar(CP_ACP, 0, local_str.data(), (int)local_str.size(), wide.data(), wlen);
+	return to_utf8(wide);
+}
+
+// UTF-8 from the wire to the process code page that local file APIs expect; unrepresentable characters become '_'
+std::string utf8_to_local(const std::string& utf8_str)
+{
+	if (utf8_str.empty() || GetACP() == CP_UTF8)
+		return utf8_str;
+
+	std::wstring wide = from_utf8(utf8_str);
+	if (wide.empty())
+		return std::string();
+
+	int len = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wide.data(), (int)wide.size(), nullptr, 0, "_", nullptr);
+	if (len <= 0)
+		return utf8_str;
+
+	std::string result(len, '\0');
+	WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wide.data(), (int)wide.size(), result.data(), len, "_", nullptr);
+	return result;
+}
+
 // Legacy format strings take player names as narrow %hs arguments, which get widened byte by byte and mangle UTF-8.
 // Rewriting %hs to %s lets callers pass a from_utf8() decoded name instead.
 std::wstring WidenFormatSpecifiers(const std::wstring& format)

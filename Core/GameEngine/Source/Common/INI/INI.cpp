@@ -297,6 +297,12 @@ void INI::prepFile( AsciiString filename, INILoadType loadType )
 	m_readBufferNext = 0;
 	m_readBufferUsed = file->size();
 	m_readBuffer = file->readEntireAndClose();
+	if (m_readBuffer == nullptr)
+	{
+		m_readBufferUsed = 0;
+		DEBUG_CRASH(( "INI::load, cannot read file '%s'", filename.str() ));
+		throw INI_CANT_OPEN_FILE;
+	}
 
 	// save our filename
 	m_filename = filename;

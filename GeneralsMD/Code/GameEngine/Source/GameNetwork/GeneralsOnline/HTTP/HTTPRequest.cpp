@@ -216,9 +216,10 @@ void HTTPRequest::Threaded_SetComplete(CURLcode result)
 		seedPos = valueStart;
 	}
 
-	std::transform(strResponse.begin(), strResponse.end(), strResponse.begin(),
+	std::string strResponseLower = strResponse;
+	std::transform(strResponseLower.begin(), strResponseLower.end(), strResponseLower.begin(),
 		[](unsigned char c) { return std::tolower(c); });
-	if (strResponse.find("token") != std::string::npos)
+	if (strResponseLower.find("token") != std::string::npos)
 	{
 		strResponse = "<redacted>";
 	}

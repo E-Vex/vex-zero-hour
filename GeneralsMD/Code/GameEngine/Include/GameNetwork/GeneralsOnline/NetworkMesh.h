@@ -218,6 +218,11 @@ public:
 	void SendACPacket(uint32_t userID, const void* pData, uint32_t dataLen);
 
 	void StartConnectionSignalling(const char* szMiddlewareID, int64_t remoteUserID, uint16_t preferredPort);
+
+	// A joiner gets its TURN credentials after its mesh exists; signalling waits for them
+	void AwaitTurnCredentials();
+	void SetTurnCredentials(const std::string& strUsername, const std::string& strToken);
+
 	void DisconnectUser(int64_t remoteUserID);
 	void Disconnect();
 
@@ -271,6 +276,15 @@ private:
 	std::string m_strTurnUsernameString;
 	std::string m_strTurnTokenString;
 	std::string m_strTurnServerList;
+
+	struct PendingSignalling
+	{
+		std::string strMiddlewareID;
+		int64_t remoteUserID;
+		uint16_t preferredPort;
+	};
+	bool m_bAwaitingTurnCredentials = false;
+	std::vector<PendingSignalling> m_vecSignallingAwaitingTurn;
 
 	// k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_* for this lobby's connections.
 	int m_iceEnable = 0;

@@ -30,7 +30,7 @@ public:
 
 	void Save_Camera_MaxHeight_WhenLobbyHost(float maxHeight)
 	{
-		if (maxHeight >= GENERALS_ONLINE_MIN_LOBBY_CAMERA_ZOOM || maxHeight <= GENERALS_ONLINE_MAX_LOBBY_CAMERA_ZOOM)
+		if (maxHeight >= GENERALS_ONLINE_MIN_LOBBY_CAMERA_ZOOM && maxHeight <= GENERALS_ONLINE_MAX_LOBBY_CAMERA_ZOOM)
 		{
 			m_Camera_MaxHeight_LobbyHost = maxHeight;
 			Save();

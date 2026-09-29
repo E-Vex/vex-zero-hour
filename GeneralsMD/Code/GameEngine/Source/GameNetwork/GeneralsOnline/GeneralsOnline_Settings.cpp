@@ -72,20 +72,30 @@ void GenOnlineSettings::Load(void)
 	std::string strSettingsFilePath = std::format("{}/{}", strSettingsFileDir, SETTINGS_FILENAME);
 	std::string strSettingsFilePathLegacy = std::format("{}/{}", GameDir, SETTINGS_FILENAME_LEGACY);
 
+	std::error_code ec;
+
 	// create directories we need
-	if (!std::filesystem::exists(strSettingsFileDir))
+	if (!std::filesystem::exists(strSettingsFileDir, ec))
 	{
-		std::filesystem::create_directory(strSettingsFileDir);
+		std::filesystem::create_directory(strSettingsFileDir, ec);
 	}
 
 	// NGMP_NOTE: Prior to 6/23, we used the game dir for settings, this code migrates any legacy settings file to the new location (game user data dir)
-	if (std::filesystem::exists(strSettingsFilePathLegacy))
+	if (std::filesystem::exists(strSettingsFilePathLegacy, ec))
 	{
-		std::filesystem::copy(strSettingsFilePathLegacy, strSettingsFilePath, std::filesystem::copy_options::overwrite_existing);
-		std::filesystem::remove(strSettingsFilePathLegacy);
+		// only drop the legacy file once its copy is in place
+		std::filesystem::copy(strSettingsFilePathLegacy, strSettingsFilePath, std::filesystem::copy_options::overwrite_existing, ec);
+		if (!ec)
+		{
+			std::filesystem::remove(strSettingsFilePathLegacy, ec);
+		}
 	}
 
 	bool bApplyDefaults = false;
+
+	// a settings file we couldn't read or parse must not be silently replaced by defaults
+	bool bReadFailed = false;
+	bool bParseFailed = false;
 
 	std::vector<uint8_t> vecBytes;
 	FILE* file = fopen(strSettingsFilePath.c_str(), "rb");
@@ -97,9 +107,21 @@ void GenOnlineSettings::Load(void)
 		if (fileSize > 0)
 		{
 			vecBytes.resize(fileSize);
-			fread(vecBytes.data(), 1, fileSize, file);
+			if (fread(vecBytes.data(), 1, fileSize, file) != static_cast<size_t>(fileSize))
+			{
+				vecBytes.clear();
+				bReadFailed = true;
+			}
+		}
+		else if (fileSize < 0)
+		{
+			bReadFailed = true;
 		}
 		fclose(file);
+	}
+	else if (errno != ENOENT)
+	{
+		bReadFailed = true;
 	}
 
 
@@ -117,9 +139,11 @@ void GenOnlineSettings::Load(void)
 		{
 			jsonSettings = nullptr;
 			bApplyDefaults = true;
+			bParseFailed = true;
 		}
 		
 		if (!bApplyDefaults && jsonSettings != nullptr)
+		try
 		{
 			if (jsonSettings.contains(SETTINGS_KEY_CAMERA))
 			{
@@ -271,6 +295,12 @@ void GenOnlineSettings::Load(void)
                 }
             }
 		}
+		catch (...)
+		{
+			// a value of the wrong type
+			bApplyDefaults = true;
+			bParseFailed = true;
+		}
 		
 	}
 	else // setup defaults
@@ -281,7 +311,7 @@ void GenOnlineSettings::Load(void)
 	if (bApplyDefaults)
 	{
 		m_Camera_MinHeight = m_Camera_MinHeight_default;
-		m_Camera_MaxHeight_LobbyHost = m_Camera_MaxHeight_LobbyHost;
+		m_Camera_MaxHeight_LobbyHost = GENERALS_ONLINE_DEFAULT_LOBBY_CAMERA_ZOOM;
 		m_bVerbose = false;
 		m_Render_LimitFramerate = true;
 		m_Render_FramerateLimit_FPSVal = 60;
@@ -294,6 +324,19 @@ void GenOnlineSettings::Load(void)
         m_Social_Notification_FriendGoesOffline_Gameplay = true;
 	}
 	
+	if (bReadFailed)
+	{
+		// keep the file on disk, the defaults above only apply to this session
+		NetworkLog(ELogVerbosity::LOG_RELEASE, "[NGMP] Could not read settings file, keeping it untouched");
+		return;
+	}
+
+	if (bParseFailed)
+	{
+		// keep the unparseable file for recovery before the defaults replace it
+		std::filesystem::rename(strSettingsFilePath, strSettingsFilePath + ".bad", ec);
+	}
+
 	// Always save so we re-serialize anything new or missing
 	Save();
 }
@@ -378,10 +421,25 @@ void GenOnlineSettings::Save()
 	std::string strData = root.dump(1);
 
 	std::string strSettingsFilePath = std::format("{}/GeneralsOnlineData/{}", TheGlobalData->getPath_UserData().str(), SETTINGS_FILENAME);
-	FILE* file = fopen(strSettingsFilePath.c_str(), "wb");
+
+	// write to a temp file and swap it in so a failed write never leaves a truncated settings file
+	std::string strTempPath = strSettingsFilePath + ".tmp";
+	bool bSaved = false;
+	FILE* file = fopen(strTempPath.c_str(), "wb");
 	if (file)
 	{
-		fwrite(strData.data(), 1, strData.size(), file);
-		fclose(file);
+		bSaved = fwrite(strData.data(), 1, strData.size(), file) == strData.size();
+		if (fclose(file) != 0)
+			bSaved = false;
+	}
+
+	if (bSaved)
+		bSaved = MoveFileExA(strTempPath.c_str(), strSettingsFilePath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+
+	if (!bSaved)
+	{
+		NetworkLog(ELogVerbosity::LOG_RELEASE, "[NGMP] Failed to save settings file");
+		std::error_code ec;
+		std::filesystem::remove(strTempPath, ec);
 	}
 }

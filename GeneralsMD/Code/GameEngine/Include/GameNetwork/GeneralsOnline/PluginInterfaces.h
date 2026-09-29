@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 enum class EConnectionState : uint8_t
 {
     NOT_CONNECTED,
@@ -55,7 +57,8 @@ enum class EAnticheatActionReason : int32_t
 class AnticheatPlugInterface
 {
 public:
-    static bool g_bPendingExitLobby;
+    // set from plugin threads
+    static std::atomic<bool> g_bPendingExitLobby;
 
     static void AC_NetworkMessageArrived(uint32_t goUserID, void* pData, uint32_t dataLen);
 
@@ -207,7 +210,8 @@ extern HWND ApplicationHWnd;
 class AnticheatPlugInterface
 {
 public:
-    static bool g_bPendingExitLobby;
+    // set from plugin threads
+    static std::atomic<bool> g_bPendingExitLobby;
 
     static void AC_NetworkMessageArrived(uint32_t goUserID, void* pData, uint32_t dataLen)
     {

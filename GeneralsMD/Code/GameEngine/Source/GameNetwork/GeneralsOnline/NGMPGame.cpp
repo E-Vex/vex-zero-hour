@@ -570,7 +570,7 @@ void NGMPGame::launchGame(void)
 			if (pos != std::string::npos) { strMapName.erase(pos, strExt.size()); }
 
             UnicodeString msg;
-            msg.format(L"Map: %hs\nPress F5 or INSERT to open the communicator.", strMapName.c_str());
+            msg.format(L"Map: %s\nPress F5 or INSERT to open the communicator.", from_utf8(strMapName).c_str());
             showNotificationBox(AsciiString::TheEmptyString, msg, false);
 		}
 

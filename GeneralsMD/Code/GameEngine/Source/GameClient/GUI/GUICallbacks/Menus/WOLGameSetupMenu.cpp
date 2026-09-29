@@ -1033,7 +1033,7 @@ static void StartPressed()
 	}
 	else
 	{
-		mapDisplayName.format(L"%hs", myGame->getMap().str());
+		mapDisplayName.translate(myGame->getMap().str());
 		willTransfer = WouldMapTransfer(myGame->getMap());
 	}
 	for( int i = 0; i < MAX_SLOTS; i++ )
@@ -1967,7 +1967,7 @@ void WOLGameSetupMenuInit( WindowLayout *layout, void *userData )
 			}
 			else
 			{
-				mapDisplayName.format(L"%hs", TheNGMPGame->getMap().str());
+				mapDisplayName.translate(TheNGMPGame->getMap().str());
 				willTransfer = WouldMapTransfer(TheNGMPGame->getMap());
 			}
 
@@ -3176,7 +3176,7 @@ void WOLGameSetupMenuUpdate( WindowLayout * layout, void *userData)
 										}
 										else
 										{
-											mapDisplayName.format(L"%hs", TheGameState->getMapLeafName(game->getMap()).str());
+											mapDisplayName.translate(TheGameState->getMapLeafName(game->getMap()).str());
 											willTransfer = WouldMapTransfer(game->getMap());
 										}
 										if (willTransfer)
@@ -3334,7 +3334,7 @@ void WOLGameSetupMenuUpdate( WindowLayout * layout, void *userData)
 									}
 									else
 									{
-										mapDisplayName.format(L"%hs", game->getMap().str());
+										mapDisplayName.translate(game->getMap().str());
 										willTransfer = WouldMapTransfer(game->getMap());
 									}
 									UnicodeString text;

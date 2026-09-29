@@ -379,6 +379,44 @@ inline Int64 getPerformanceCounterFrequency()
 	return tmp;
 }
 
+// Startup splash window created by WinMain; the game window stays hidden until handed over here
+HWND ApplicationSplashHWnd = nullptr;
+
+// Show the game window and close the splash
+static void finishStartupSplash()
+{
+	extern HWND ApplicationHWnd;
+	if (ApplicationSplashHWnd == nullptr)
+		return;
+
+	if (ApplicationHWnd != nullptr)
+	{
+		::ShowWindow(ApplicationHWnd, SW_SHOW);
+		::SetForegroundWindow(ApplicationHWnd);
+		::SetFocus(ApplicationHWnd);
+	}
+	::DestroyWindow(ApplicationSplashHWnd);
+	ApplicationSplashHWnd = nullptr;
+}
+
+// Windowed hand-over, once per frame until done: the first frame shows the game window behind the
+// splash without activating it, the next one (after a presented frame) closes the splash
+static void updateStartupSplash()
+{
+	extern HWND ApplicationHWnd;
+	if (ApplicationSplashHWnd == nullptr || ApplicationHWnd == nullptr)
+		return;
+
+	if (!::IsWindowVisible(ApplicationHWnd))
+	{
+		::SetWindowPos(ApplicationHWnd, ApplicationSplashHWnd, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+		return;
+	}
+
+	finishStartupSplash();
+}
+
 // W3DDisplay::W3DDisplay =====================================================
 /** */
 //=============================================================================
@@ -888,6 +926,13 @@ void W3DDisplay::init()
 #else
 			WW3D::Set_MSAA_Mode(WW3D::MultiSampleModeEnum::MULTISAMPLE_MODE_NONE);
 #endif
+
+			// exclusive fullscreen needs the game window visible and in the foreground when the device is
+			// created, and the mode switch blanks the screen anyway, so hand over from the splash now
+			if (!getWindowed())
+			{
+				finishStartupSplash();
+			}
 
 			renderDeviceError = WW3D::Set_Render_Device(
 				0,
@@ -1810,6 +1855,8 @@ void W3DDisplay::draw()
 
 	if (TheGlobalData->m_headless)
 		return;
+
+	updateStartupSplash();
 
 	// TheSuperHackers @feature bobtista 10/07/2026 Show messages for screenshots finished by the screenshot thread.
 	W3D_UpdateScreenshotMessages();
