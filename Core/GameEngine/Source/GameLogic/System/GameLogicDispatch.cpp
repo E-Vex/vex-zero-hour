@@ -758,6 +758,24 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onSelfDestruct(msg);
 			break;
 		}
+#if defined(RTS_ZEROHOUR)
+		// TheSuperHackers @feature E-Vex 16/10/2026 AI Co-Pilot.
+		// F9 cycles the co-pilot's level of control for the local human player.
+		// The toggle arrives here as a command message from the client-side
+		// hotkey handler in CommandXlat.
+		case GameMessage::MSG_AI_COPILOT_TOGGLE:
+		{
+			Player* localPlayer = ThePlayerList->getLocalPlayer();
+			if (localPlayer != nullptr
+				&& TheGameLogic->isInSkirmishGame()
+				&& TheGameLogic->isInReplayGame() == FALSE
+				&& localPlayer->getPlayerType() == PLAYER_HUMAN)
+			{
+				localPlayer->cycleAITeammateMode();
+			}
+			break;
+		}
+#endif
 		case GameMessage::MSG_SET_REPLAY_CAMERA:
 		{
 			onSetReplayCamera(msg);

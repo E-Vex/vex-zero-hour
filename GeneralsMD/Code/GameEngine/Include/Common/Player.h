@@ -67,6 +67,7 @@ class BuildListInfo;
 class PolygonTrigger;
 class ThingTemplate;
 class AIPlayer;
+class AITeammatePlayer;
 class AIGroup;
 class GameMessage;
 class ResourceGatheringManager;
@@ -253,6 +254,14 @@ public:
 	/// return the type of controller
 	PlayerType getPlayerType() const { return m_playerType; }
 	void setPlayerType(PlayerType t, Bool skirmish);
+
+	// TheSuperHackers @feature E-Vex 16/10/2026 AI Co-Pilot: an AI teammate that plays
+	// for a human player without taking the UI away from them. See GameLogic/AICoPilot.h.
+	void attachAITeammate();                                                             ///< create (or keep) the co-pilot for this player
+	void detachAITeammate();                                                             ///< remove the co-pilot (if any)
+	AITeammatePlayer* getAITeammate() const { return m_aiTeammate; }    ///< the co-pilot, or null
+	void cycleAITeammateMode();                                                  ///< F9 hotkey: OFF -> OPENING -> FULL -> OFF
+	void addAITeammateBuildListEntry(const AsciiString& templateName, const Coord3D& pos, Real angle, Bool unlimitedRebuilds); ///< queue a co-pilot structure
 
 	PlayerIndex getPlayerIndex() const { return m_playerIndex; }
 
@@ -768,6 +777,7 @@ private:
 	ProductionChangeMap					m_productionTimeChanges;			///< Map to keep track of Faction specific discounts or penalties on build times of units
 	ProductionVeterancyMap			m_productionVeterancyLevels;	///< Map to keep track of starting level of produced units
 	AIPlayer*										m_ai;													///< if PLAYER_COMPUTER, the entity that does the thinking
+	AITeammatePlayer*                                                        m_aiTeammate;                                                                   ///< the AI Co-Pilot for human players (see GameLogic/AICoPilot.h)
 	Int													m_mpStartIndex;								///< The player's starting index for multiplayer.
 	ResourceGatheringManager*		m_resourceGatheringManager;		///< Keeps track of all Supply Centers and Warehouses
 	TunnelTracker*							m_tunnelSystem;								///< All TunnelContain buildings use this part of me for actual containment

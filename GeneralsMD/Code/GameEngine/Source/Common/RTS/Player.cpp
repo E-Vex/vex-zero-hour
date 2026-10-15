@@ -80,6 +80,7 @@
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/AICoPilot.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
@@ -310,6 +311,7 @@ Player::Player( Int playerIndex )
 	m_upgradeList = nullptr;
 	m_pBuildList = nullptr;
 	m_ai = nullptr;
+	m_aiTeammate = nullptr;
 	m_resourceGatheringManager = nullptr;
 	m_defaultTeam = nullptr;
 	m_radarCount = 0;
@@ -383,6 +385,7 @@ void Player::init(const PlayerTemplate* pt)
 
 	deleteInstance(m_ai);
 	m_ai = nullptr;
+	m_aiTeammate = nullptr;
 
 	deleteInstance(m_resourceGatheringManager);
 	m_resourceGatheringManager = nullptr;
@@ -742,6 +745,7 @@ void Player::setPlayerType(PlayerType t, Bool skirmish)
 
 	deleteInstance(m_ai);
 	m_ai = nullptr;
+	m_aiTeammate = nullptr;
 
 	if (t == PLAYER_COMPUTER)
 	{
@@ -752,6 +756,89 @@ void Player::setPlayerType(PlayerType t, Bool skirmish)
 			// create AIPlayer and attach to this Player
 			m_ai = newInstance(AIPlayer)( this );
 		}
+	}
+}
+
+//=============================================================================
+// TheSuperHackers @feature E-Vex 16/10/2026 AI Co-Pilot.
+// Attach the co-pilot to this (human) player. The co-pilot reuses the m_ai slot so
+// that Player::update(), newMap() and the production callbacks tick it automatically,
+// but the player type stays PLAYER_HUMAN: the human keeps the UI, the build menus and
+// every buildability rule that applies to humans (fair play).
+//=============================================================================
+void Player::attachAITeammate()
+{
+	if (m_ai != nullptr)
+	{
+		if (m_aiTeammate != nullptr)
+			return;             // already attached
+		// A regular AI is thinking for this player; don't fight it.
+		if (getPlayerType() == PLAYER_COMPUTER)
+			return;
+		deleteInstance(m_ai);
+		m_ai = nullptr;
+	}
+
+	m_ai = newInstance(AITeammatePlayer)( this );
+	m_aiTeammate = (AITeammatePlayer*)m_ai;
+}
+
+//=============================================================================
+void Player::detachAITeammate()
+{
+	if (m_aiTeammate == nullptr)
+		return;
+
+	deleteInstance(m_ai);
+	m_ai = nullptr;
+	m_aiTeammate = nullptr;
+
+	// Restore normal human production.
+	setCanBuildUnits( true );
+}
+
+//=============================================================================
+void Player::cycleAITeammateMode()
+{
+	if (m_aiTeammate == nullptr)
+	{
+		attachAITeammate();
+		return;
+	}
+
+	m_aiTeammate->cycleMode();
+
+	if (m_aiTeammate->getMode() == COPILOT_MODE_OFF)
+	{
+		// Fully detach when the player cycles down to OFF.
+		detachAITeammate();
+	}
+}
+
+//=============================================================================
+// Queue a co-pilot structure into this player's build list. Unlimited rebuilds
+// makes the co-pilot re-construct the building when it gets destroyed.
+//=============================================================================
+void Player::addAITeammateBuildListEntry(const AsciiString& templateName, const Coord3D& pos, Real angle, Bool unlimitedRebuilds)
+{
+	BuildListInfo *newInfo = newInstance( BuildListInfo );
+	newInfo->setTemplateName(templateName);
+	newInfo->setLocation(pos);
+	newInfo->setAngle(angle);
+	newInfo->setNumRebuilds(unlimitedRebuilds ? UNLIMITED_REBUILDS : 1);
+	newInfo->setNextBuildList(nullptr);
+
+	// append at the end to preserve the opening order
+	if (m_pBuildList == nullptr)
+	{
+		m_pBuildList = newInfo;
+	}
+	else
+	{
+		BuildListInfo *last = m_pBuildList;
+		while (last->getNext() != nullptr)
+			last = last->getNext();
+		last->setNextBuildList(newInfo);
 	}
 }
 
@@ -775,6 +862,7 @@ void Player::deletePlayerAI()
 {
 	deleteInstance(m_ai);
 	m_ai = nullptr;
+	m_aiTeammate = nullptr;
 }
 
 //=============================================================================
@@ -4260,6 +4348,17 @@ void Player::xfer( Xfer *xfer )
 	// ai player data
 	Bool aiPlayerPresent = m_ai ? TRUE : FALSE;
 	xfer->xferBool( &aiPlayerPresent );
+
+	// TheSuperHackers @feature E-Vex 16/10/2026 AI Co-Pilot.
+	// When loading a save game, a human player whose co-pilot was active has no m_ai
+	// yet (setPlayerType only creates AI for computer players). Recreate the teammate
+	// before the snapshot loads so the save/load presence check below succeeds.
+	if( xfer->getXferMode() == XFER_LOAD && aiPlayerPresent == TRUE && m_ai == nullptr && getPlayerType() == PLAYER_HUMAN )
+	{
+		m_ai = newInstance(AITeammatePlayer)( this );
+		m_aiTeammate = (AITeammatePlayer*)m_ai;
+	}
+
 	if( (aiPlayerPresent == TRUE && m_ai == nullptr) || (aiPlayerPresent == FALSE && m_ai != nullptr) )
 	{
 

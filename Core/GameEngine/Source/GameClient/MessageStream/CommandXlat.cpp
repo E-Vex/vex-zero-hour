@@ -3953,6 +3953,19 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
                 disp = DESTROY_MESSAGE;
             }
+            // TheSuperHackers @feature E-Vex 16/10/2026 AI Co-Pilot hotkey.
+            // F9 cycles the co-pilot's level of control (OFF -> OPENING -> FULL).
+            // The toggle is forwarded to the logic thread as a command message and
+            // handled in GameLogicDispatch, like every other player command.
+            else if (key == KEY_F9)
+            {
+                if (TheGameLogic && TheGameLogic->isInSkirmishGame() && TheMessageStream)
+                {
+                    TheMessageStream->appendMessage( GameMessage::MSG_AI_COPILOT_TOGGLE );
+                }
+
+                disp = DESTROY_MESSAGE;
+            }
 
             break;
         }

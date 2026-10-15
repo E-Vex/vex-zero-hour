@@ -1815,6 +1815,23 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	Player* localPlayer = ThePlayerList->getLocalPlayer();
 	Player* observerPlayer = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey("ReplayObserver"));
 
+	// TheSuperHackers @feature E-Vex 16/10/2026 AI Co-Pilot.
+	// At the start of a fresh skirmish game the co-pilot takes over the opening for
+	// the local human player: it runs the opening build sequence, keeps the base
+	// rebuilt, trains units and defends the perimeter while the player fights the
+	// battles. Press F9 any time to cycle its level of control.
+	// Save games restore the co-pilot through Player::xfer instead; replays are
+	// excluded so their simulation stays untouched.
+	if (loadingSaveGame == FALSE
+		&& TheGameLogic->isInSkirmishGame()
+		&& !(TheRecorder && TheRecorder->isPlaybackMode())
+		&& localPlayer != nullptr
+		&& localPlayer->isPlayerObserver() == FALSE
+		&& localPlayer->getPlayerType() == PLAYER_HUMAN)
+	{
+		localPlayer->attachAITeammate();
+	}
+
 	// set the radar as on a new map
 	TheRadar->newMap(TheTerrainLogic);
 

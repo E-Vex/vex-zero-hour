@@ -131,6 +131,7 @@ static PoolSizeRec sizes[] =
 	{ "TeamInQueue", 32, 32 },
 	{ "AIPlayer", 12, 4 },
 	{ "AISkirmishPlayer", 8, 8 },
+	{ "AITeammatePlayer", 4, 4 },
 	{ "AIStateMachine",  600, 32 },
 	{ "JetAIStateMachine",  64, 32 },
 	{ "HeliAIStateMachine",  64, 32 },
